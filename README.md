@@ -38,13 +38,15 @@ Key design decisions:
 
 ## Servers
 
-| Host         | Role                    | Key Services                              |
-|--------------|-------------------------|-------------------------------------------|
-| AI Server    | Local AI inference      | Ollama, Open WebUI, Home Assistant        |
-| Media Center | Media streaming         | Jellyfin, Navidrome, Kavita               |
-| Productivity | Personal cloud services | Immich, Nextcloud, Collabora, Kopia       |
-| DNS Server   | Network services        | Pi-hole, Unbound, Omada Controller, Chrony|
-| Security     | Monitoring and proxy    | Caddy, Beszel, Uptime Kuma, n8n, ntfy     |
+| Host         | Role                    | Key Services                               |
+|--------------|-------------------------|--------------------------------------------|
+| AI Server    | Local AI inference      | Ollama, Open WebUI, ComfyUI, Home Assistant|
+| Media Center | Media streaming         | Jellyfin, Navidrome                        |
+| Productivity | Personal cloud services | Immich, Nextcloud, Collabora, Kopia        |
+| DNS Server   | Network services        | Pi-hole, Unbound, Omada Controller, Chrony |
+| Security     | Monitoring and proxy    | Caddy, Vaultwarden, Uptime Kuma, ntfy, SearXNG |
+
+For full documentation on each service see the [services](services/) directory.
 
 ## Self-Hosted Services
 
