@@ -1,6 +1,7 @@
 ## Vaultwarden
 
-**Host:** Security Server (FapNetPrime)
+
+**Host:** Security Server
 **Deployment:** Docker (Docker Compose)
 **Access:** https://vaultwarden.home.arpa
 
