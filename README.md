@@ -4,7 +4,8 @@
 
 This repository documents my personal home lab — a fully self-hosted
 private infrastructure built and operated independently as a hands-on
-learning environment.
+learning environment.This is an active personal project. Documentation 
+is continuously updated as the infrastructure evolves.
 
 ## What This Is
 
