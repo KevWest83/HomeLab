@@ -77,6 +77,9 @@ explicitly controlled — only permitted traffic reaches this segment.
 - **DHCP:** Centralized address management across all VLANs
 - **Gateway:** Single exit point for all network traffic
 - **VPN:** WireGuard endpoint for secure remote access
+- **DNS Resolution:** Unbound (recursive DNS resolver, runs natively 
+  within OPNsense — handles local DNS resolution without forwarding 
+  queries to upstream third-party resolvers)
 
 ### WireGuard Remote Access
 WireGuard VPN runs directly on OPNsense, leveraging AES-NI hardware
@@ -108,6 +111,17 @@ fully self-hosted equivalents accessible anywhere via encrypted tunnel.
 - No services exposed directly to the internet — VPN only remote access
 - Single firewall appliance as authoritative network policy enforcer
 - Static IP eliminates dynamic DNS dependency for VPN reliability
+
+### DNS Architecture
+DNS resolution is handled by Unbound running natively inside OPNsense
+rather than forwarding queries to an upstream provider like Google or
+Cloudflare. This means DNS queries are resolved recursively from root
+servers directly, with no third party in the chain. Pi-hole sits in
+front of Unbound for network-wide ad and tracker blocking before
+queries are resolved.
+
+The full DNS chain is:
+Client → Pi-hole (filtering) → Unbound in OPNsense (resolution) → Root servers
 
 ### Update Method
 Updates applied via OPNsense web UI:
