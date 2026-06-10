@@ -1,0 +1,67 @@
+services:
+  immich_postgres:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: immich
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: immich
+    volumes:
+      - /media/storage/immich/postgres:/var/lib/postgresql/data
+    networks:
+      default:
+        aliases:
+          - database
+
+  immich_db_backup:
+    container_name: immich_db_backup
+    image: prodrigestivill/postgres-backup-local:14
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=database
+      - POSTGRES_CLUSTER=true
+      - POSTGRES_USER=immich
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=immich
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_SUFFIX=.sql
+      - ZIP=true
+    volumes:
+      - /media/storage/immich/database-backups:/backups
+    depends_on:
+      - immich_postgres
+
+  immich_redis:
+    image: valkey/valkey:8
+    restart: unless-stopped
+    volumes:
+      - /media/storage/immich/redis:/data
+    networks:
+      default:
+        aliases:
+          - redis
+
+  immich_server:
+    image: ghcr.io/immich-app/immich-server:v2
+    restart: unless-stopped
+    depends_on:
+      - immich_postgres
+      - immich_redis
+    environment:
+      DB_HOSTNAME: database
+      DB_PORT: "5432"
+      DB_USERNAME: immich
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE_NAME: immich
+      REDIS_HOSTNAME: redis
+    volumes:
+      - /media/storage/immich/library:/data
+    ports:
+      - "2283:2283"
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:v2
+    restart: unless-stopped
+    volumes:
+      - /media/storage/immich/ml-cache:/cache
