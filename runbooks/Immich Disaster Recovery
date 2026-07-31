@@ -1,0 +1,158 @@
+# Incident Report & Migration: Immich Disaster Recovery (Production Server to Primary AI Server)
+
+**Date:** July 2026  
+**Status:** Resolved  
+**Target Repository:** Public GitHub / Gitea  
+
+---
+
+## 1. Executive Summary
+In July 2026, the Immich instance hosted on the **production server** experienced a critical outage, rendering the photo and video backup service unavailable to users. To restore service and ensure long-term stability, a disaster recovery plan was executed to migrate the entire Immich stack—including the PostgreSQL database, application configurations, and raw asset libraries—from the **production server** to the **primary AI server**. 
+
+The migration was completed successfully, service was fully restored, and data integrity was verified. Machine learning optimization and advanced hardware acceleration setups are deferred to a subsequent project and are excluded from this recovery scope.
+
+---
+
+## 2. Incident & Root Cause Analysis
+* **Symptom:** Immich web interface and mobile applications failed to connect. Under the hood, containers on the production server were unresponsive, and storage access degraded.
+* **Root Cause:** Hardware degradation/storage volume exhaustion on the source host, leading to filesystem read-only states and container failures.
+* **Impact:** 
+  * Complete downtime of the Immich application.
+  * Temporary suspension of mobile auto-backups.
+  * Zero data loss occurred due to intact underlying storage blocks, allowing for a cold-copy migration.
+
+---
+
+## 3. Before and After State
+
+| Metric / Attribute | Before (Production Server) | After (Primary AI Server) |
+| :--- | :--- | :--- |
+| **Host System** | Production Server (`<production_server_ip>`) | Primary AI Server (`<primary_ai_server_ip>`) |
+| **Storage Architecture** | Local Storage / Direct Attached | Local SSD Pool |
+| **Database Host** | PostgreSQL container on production server | PostgreSQL container on primary AI server |
+| **App Paths (Assets)** | `/path/to/production_server/immich/upload` | `/path/to/primary_ai_server/immich/upload` |
+| **App Paths (Database)**| `/path/to/production_server/immich/postgres` | `/path/to/primary_ai_server/immich/postgres` |
+| **Machine Learning** | Active (Standard CPU/GPU) | Deferred (Disabled/Basic placeholder config) |
+
+---
+
+## 4. Disaster Recovery & Migration Steps
+
+The migration was performed using a cold-backup strategy to guarantee database and asset consistency.
+
+### Step 1: Data Preservation and Extraction (Production Server)
+Before decommissioning the old instance, all active assets and database states were backed up.
+
+1. **Stop the Immich stack** on the production server to prevent write operations during data transfer:
+   ```bash
+   docker compose down
+   ```
+2. **Perform a database dump** (if the database container is still startable):
+   ```bash
+   docker exec -t immich_postgres pg_dumpall -c -U postgres > immich_db_backup.sql
+   ```
+   *Note: If the container could not start, the raw database directory was copied directly for recovery container processing.*
+3. **Archive / Sync the raw assets**:
+   Using `rsync` to preserve timestamps, permissions, and directory structures of the massive `upload/` directory:
+   ```bash
+   rsync -avz --progress /path/to/production_server/immich/upload/ user@<primary_ai_server_ip>:/path/to/primary_ai_server/immich/upload/
+   ```
+
+### Step 2: Destination Environment Prep (Primary AI Server)
+On the primary AI server, directories were provisioned with correct ownership and permissions.
+
+```bash
+mkdir -p /path/to/primary_ai_server/immich/upload
+mkdir -p /path/to/primary_ai_server/immich/postgres
+chmod -R 755 /path/to/primary_ai_server/immich/upload
+```
+
+### Step 3: Deployment Configuration (Docker Compose)
+A sanitized version of the `docker-compose.yml` and `.env` files was prepared for the primary AI server. Machine learning services were kept at minimal resource allocation or omitted to focus solely on core asset recovery.
+
+#### `docker-compose.yml`
+```yaml
+name: immich
+
+services:
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:release
+    volumes:
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    ports:
+      - "2283:2283"
+    depends_on:
+      - redis
+      - database
+    restart: always
+
+  redis:
+    container_name: immich_redis
+    image: docker.io/redis:6.2-alpine
+    restart: always
+
+  database:
+    container_name: immich_postgres
+    image: docker.io/tensorchord/pgvecto-rs:pg14-v0.2.0
+    environment:
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  pgdata:
+  model-cache:
+```
+
+#### `.env` (Sanitized)
+```env
+# Core Settings
+PORT=2283
+IMMICH_VERSION=release
+
+# Database
+DB_HOSTNAME=database
+DB_USERNAME=postgres
+DB_PASSWORD=your_secure_db_password_here
+DB_DATABASE_NAME=immich
+
+# Storage Paths on Primary AI Server
+UPLOAD_LOCATION=/path/to/primary_ai_server/immich/upload
+DB_DATA_LOCATION=/path/to/primary_ai_server/immich/postgres
+```
+
+### Step 4: Database and File Restoration
+1. **Start the database and Redis containers first** to prepare for the SQL restore:
+   ```bash
+   docker compose up -d database redis
+   ```
+2. **Restore the database schema and data**:
+   ```bash
+   cat immich_db_backup.sql | docker exec -i immich_postgres psql -U postgres -d immich
+   ```
+3. **Verify the migration paths**:
+   Ensure all transferred files in `/path/to/primary_ai_server/immich/upload` align with the path expectations set in the `.env` file.
+
+### Step 5: Bringing the Stack Online
+1. **Launch the entire core service stack**:
+   ```bash
+   docker compose up -d
+   ```
+2. **Monitor the logs** for structural database updates or permission issues:
+   ```bash
+   docker compose logs -f immich-server
+   ```
+
+---
+
+## 5. Verification & Post-Mortem Validation
+* **Data Integrity Check:** Logged into the Immich web UI at `http://<primary_ai_server_ip>:2283`. Confirmed that the timeline, user accounts, albums, and historical metadata fully loaded without errors.
+* **Mobile Sync Check:** Reconfigured the mobile application to point to the new host address on the primary AI server. Successfully ran a delta backup of new photos.
+* **Status:** **Fully Operational.** (Note: Machine learning workloads and vector search tuning remain paused/unoptimized on the primary AI server, to be handled under the upcoming optimization initiative).
